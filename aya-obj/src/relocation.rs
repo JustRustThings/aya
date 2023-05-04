@@ -1,7 +1,6 @@
 //! Program relocation handling.
 
 use core::mem;
-use std::collections::HashSet;
 
 use alloc::{borrow::ToOwned, string::String};
 use log::debug;
@@ -14,15 +13,17 @@ use crate::{
     },
     maps::Map,
     obj::{Function, Object, Program},
-    thiserror::{self, Error},
-    util::HashMap,
+    util::{HashMap, HashSet},
     BpfSectionKind,
 };
+
+#[cfg(not(feature = "std"))]
+use crate::std;
 
 pub(crate) const INS_SIZE: usize = mem::size_of::<bpf_insn>();
 
 /// The error type returned by [`Object::relocate_maps`] and [`Object::relocate_calls`]
-#[derive(Error, Debug)]
+#[derive(thiserror::Error, Debug)]
 #[error("error relocating `{function}`")]
 pub struct BpfRelocationError {
     /// The function name
@@ -33,7 +34,7 @@ pub struct BpfRelocationError {
 }
 
 /// Relocation failures
-#[derive(Debug, Error)]
+#[derive(Debug, thiserror::Error)]
 pub enum RelocationError {
     /// Unknown symbol
     #[error("unknown symbol, index `{index}`")]
@@ -428,7 +429,7 @@ impl<'a> FunctionLinker<'a> {
 
             let callee_ins_index = self.link_function(program, callee)? as i32;
 
-            let mut ins = &mut program.instructions[ins_index];
+            let ins = &mut program.instructions[ins_index];
             let ins_index = ins_index as i32;
             ins.imm = callee_ins_index - ins_index - 1;
             debug!(

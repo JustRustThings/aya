@@ -9,7 +9,7 @@ use std::{
 
 use aya_obj::{
     btf::{BtfFeatures, BtfRelocationError},
-    generated::BPF_F_XDP_HAS_FRAGS,
+    generated::{BPF_F_SLEEPABLE, BPF_F_XDP_HAS_FRAGS},
     relocation::BpfRelocationError,
     BpfSectionKind, Features,
 };
@@ -126,13 +126,14 @@ pub struct BpfLoader<'a> {
 
 bitflags! {
     /// Used to set the verifier log level flags in [BpfLoader](BpfLoader::verifier_log_level()).
+    #[derive(Debug)]
     pub struct VerifierLogLevel: u32 {
         /// Sets no verifier logging.
         const DISABLE = 0;
         /// Enables debug verifier logging.
         const DEBUG = 1;
         /// Enables verbose verifier logging.
-        const VERBOSE = 2 | Self::DEBUG.bits;
+        const VERBOSE = 2 | Self::DEBUG.bits();
         /// Enables verifier stats.
         const STATS = 4;
     }
@@ -140,9 +141,7 @@ bitflags! {
 
 impl Default for VerifierLogLevel {
     fn default() -> Self {
-        Self {
-            bits: Self::DEBUG.bits | Self::STATS.bits,
-        }
+        Self::DEBUG | Self::STATS
     }
 }
 
@@ -364,7 +363,7 @@ impl<'a> BpfLoader<'a> {
     /// # Ok::<(), aya::BpfError>(())
     /// ```
     pub fn load(&mut self, data: &[u8]) -> Result<Bpf, BpfError> {
-        let verifier_log_level = self.verifier_log_level.bits;
+        let verifier_log_level = self.verifier_log_level.bits();
         let mut obj = Object::parse(data)?;
         obj.patch_map_data(self.globals.clone())?;
 
@@ -513,12 +512,10 @@ impl<'a> BpfLoader<'a> {
                                 data: ProgramData::new(prog_name, obj, btf_fd, verifier_log_level),
                             })
                         }
-                        ProgramSection::Xdp {
-                            frags_supported, ..
-                        } => {
+                        ProgramSection::Xdp { frags, .. } => {
                             let mut data =
                                 ProgramData::new(prog_name, obj, btf_fd, verifier_log_level);
-                            if *frags_supported {
+                            if *frags {
                                 data.flags = BPF_F_XDP_HAS_FRAGS;
                             }
                             Program::Xdp(Xdp { data })
@@ -586,9 +583,14 @@ impl<'a> BpfLoader<'a> {
                                 data: ProgramData::new(prog_name, obj, btf_fd, verifier_log_level),
                             })
                         }
-                        ProgramSection::Lsm { .. } => Program::Lsm(Lsm {
-                            data: ProgramData::new(prog_name, obj, btf_fd, verifier_log_level),
-                        }),
+                        ProgramSection::Lsm { sleepable, .. } => {
+                            let mut data =
+                                ProgramData::new(prog_name, obj, btf_fd, verifier_log_level);
+                            if *sleepable {
+                                data.flags = BPF_F_SLEEPABLE;
+                            }
+                            Program::Lsm(Lsm { data })
+                        }
                         ProgramSection::BtfTracePoint { .. } => {
                             Program::BtfTracePoint(BtfTracePoint {
                                 data: ProgramData::new(prog_name, obj, btf_fd, verifier_log_level),

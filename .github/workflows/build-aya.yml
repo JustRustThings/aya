@@ -24,12 +24,16 @@ jobs:
           - riscv64gc-unknown-linux-gnu
     runs-on: ubuntu-20.04
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
           override: true
+
+      - uses: taiki-e/install-action@cargo-hack
+      - name: Check
+        run: cargo hack check --feature-powerset --ignore-private
 
       - uses: Swatinem/rust-cache@v1
       - name: Prereqs

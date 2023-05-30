@@ -237,7 +237,7 @@ impl Object {
                 .section_infos
                 .get(&section_name.to_string())
                 .ok_or_else(|| BtfRelocationError {
-                    section: format!("section@{section_name}"),
+                    section: section_name.to_string(),
                     error: RelocationError::SectionNotFound,
                 })?;
 
@@ -263,25 +263,34 @@ impl Object {
     }
 }
 
-fn get_function_by_relocation<'a>(
+fn is_relocation_inside_function(
+    section_index: &SectionIndex,
+    func: &Function,
+    rel: &Relocation,
+) -> bool {
+    if section_index.0 != func.section_index.0 {
+        return false;
+    }
+
+    let ins_offset = rel.ins_offset / mem::size_of::<bpf_insn>();
+    let func_offset = func.section_offset / mem::size_of::<bpf_insn>();
+    let func_size = func.instructions.len();
+
+    (func_offset..func_offset + func_size).contains(&ins_offset)
+}
+
+fn function_by_relocation<'a>(
     section_index: &SectionIndex,
     functions: &'a mut BTreeMap<(usize, u64), Function>,
     rel: &Relocation,
 ) -> Option<&'a mut Function> {
-    for (_, func) in functions.range_mut((
-        Included(&(section_index.0, 0)),
-        Included(&(section_index.0, u64::MAX)),
-    )) {
-        let ins_offset = rel.ins_offset / mem::size_of::<bpf_insn>();
-        let func_offset = func.section_offset / mem::size_of::<bpf_insn>();
-        let func_size = func.instructions.len();
-
-        if ins_offset >= func_offset && ins_offset < func_offset + func_size {
-            return Some(func);
-        }
-    }
-
-    None
+    functions
+        .range_mut((
+            Included(&(section_index.0, 0)),
+            Included(&(section_index.0, u64::MAX)),
+        ))
+        .map(|(_, func)| func)
+        .find(|func| is_relocation_inside_function(section_index, func, rel))
 }
 
 fn relocate_btf_functions<'target>(
@@ -292,9 +301,14 @@ fn relocate_btf_functions<'target>(
     target_btf: &'target Btf,
     candidates_cache: &mut HashMap<u32, Vec<Candidate<'target>>>,
 ) -> Result<(), RelocationError> {
+    let mut last_function_opt: Option<&mut Function> = None;
+
     for rel in relos {
-        let function = get_function_by_relocation(section_index, functions, rel)
-            .ok_or(RelocationError::FunctionNotFound)?;
+        let function = match last_function_opt.take() {
+            Some(func) if is_relocation_inside_function(section_index, func, rel) => func,
+            _ => function_by_relocation(section_index, functions, rel)
+                .ok_or(RelocationError::FunctionNotFound)?,
+        };
 
         let instructions = &mut function.instructions;
         let ins_index = (rel.ins_offset - function.section_offset) / mem::size_of::<bpf_insn>();
@@ -347,16 +361,13 @@ fn relocate_btf_functions<'target>(
             let conflicts = matches
                 .filter_map(|(cand_name, cand_spec, cand_comp_rel)| {
                     if cand_spec.bit_offset != target_spec.bit_offset {
-                        match (
-                            cand_comp_rel.target.as_ref(),
-                            target_comp_rel.target.as_ref(),
-                        ) {
-                            (Some(cand_comp_rel_target), Some(target_comp_rel_target))
-                                if cand_comp_rel_target.value != target_comp_rel_target.value =>
-                            {
-                                return Some(cand_name)
-                            }
-                            _ => {}
+                        return Some(cand_name);
+                    } else if let (Some(cand_comp_rel_target), Some(target_comp_rel_target)) = (
+                        cand_comp_rel.target.as_ref(),
+                        target_comp_rel.target.as_ref(),
+                    ) {
+                        if cand_comp_rel_target.value != target_comp_rel_target.value {
+                            return Some(cand_name);
                         }
                     }
 
@@ -378,6 +389,8 @@ fn relocate_btf_functions<'target>(
         };
 
         comp_rel.apply(function, rel, local_btf, target_btf)?;
+
+        last_function_opt = Some(function);
     }
 
     Ok(())
@@ -912,7 +925,9 @@ impl ComputedRelocation {
                     relocation_number: rel.number,
                 })?;
 
-        if self.target.is_none() {
+        let target = if let Some(target) = self.target.as_ref() {
+            target
+        } else {
             let is_ld_imm64 = ins.code == (BPF_LD | BPF_DW) as u8;
 
             poison_insn(ins);
@@ -930,11 +945,10 @@ impl ComputedRelocation {
             }
 
             return Ok(());
-        }
+        };
 
         let class = (ins.code & 0x07) as u32;
 
-        let target = self.target.as_ref().unwrap();
         let target_value = target.value;
 
         match class {

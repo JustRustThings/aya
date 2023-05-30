@@ -605,8 +605,6 @@ mod test {
 
         assert_eq!(fun.instructions[0].src_reg(), BPF_PSEUDO_MAP_FD as u8);
         assert_eq!(fun.instructions[0].imm, 1);
-
-        mem::forget(map);
     }
 
     #[test]
@@ -666,9 +664,6 @@ mod test {
 
         assert_eq!(fun.instructions[1].src_reg(), BPF_PSEUDO_MAP_FD as u8);
         assert_eq!(fun.instructions[1].imm, 2);
-
-        mem::forget(map_1);
-        mem::forget(map_2);
     }
 
     #[test]
@@ -705,8 +700,6 @@ mod test {
 
         assert_eq!(fun.instructions[0].src_reg(), BPF_PSEUDO_MAP_FD as u8);
         assert_eq!(fun.instructions[0].imm, 1);
-
-        mem::forget(map);
     }
 
     #[test]
@@ -766,8 +759,5 @@ mod test {
 
         assert_eq!(fun.instructions[1].src_reg(), BPF_PSEUDO_MAP_FD as u8);
         assert_eq!(fun.instructions[1].imm, 2);
-
-        mem::forget(map_1);
-        mem::forget(map_2);
     }
 }

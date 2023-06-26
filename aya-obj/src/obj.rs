@@ -46,6 +46,8 @@ pub struct Features {
     pub bpf_probe_read_kernel: bool,
     pub bpf_perf_link: bool,
     pub bpf_global_data: bool,
+    pub bpf_cookie: bool,
+    pub bpf_syscall_wrapper: bool,
     pub btf: Option<BtfFeatures>,
 }
 
@@ -548,6 +550,8 @@ impl Object {
                     address: symbol.address(),
                     size: symbol.size(),
                     is_definition: symbol.is_definition(),
+                    is_external: symbol.is_undefined() && (symbol.is_global() || symbol.is_weak()),
+                    is_weak: symbol.is_weak(),
                     kind: symbol.kind(),
                 };
                 bpf_obj.symbol_table.insert(symbol.index().0, sym);
@@ -1502,6 +1506,8 @@ mod tests {
                 address,
                 size,
                 is_definition: false,
+                is_external: false,
+                is_weak: false,
                 kind: SymbolKind::Data,
             },
         );
@@ -2364,6 +2370,8 @@ mod tests {
                 address: 0,
                 size: 3,
                 is_definition: true,
+                is_external: false,
+                is_weak: false,
                 kind: SymbolKind::Data,
             },
         );

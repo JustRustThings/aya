@@ -27,6 +27,7 @@ use crate::{
         },
         copy_instructions,
     },
+    programs::probe::create_as_probe,
     sys::{kernel_version, syscall, SysResult, Syscall},
     util::VerifierLog,
     Btf, Pod, BPF_OBJ_NAME_LEN,
@@ -711,6 +712,78 @@ pub(crate) fn is_bpf_global_data_supported() -> bool {
             let fd = v as RawFd;
 
             unsafe { close(fd) };
+
+            return true;
+        }
+    }
+
+    false
+}
+
+pub(crate) fn is_bpf_cookie_supported() -> bool {
+    let mut attr = unsafe { mem::zeroed::<bpf_attr>() };
+    let u = unsafe { &mut attr.__bindgen_anon_3 };
+
+    let prog: &[u8] = &[
+        0x85, 0x00, 0x00, 0x00, 0xAE, 0x00, 0x00, 0x00, // call 174
+        0x95, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // exit
+    ];
+
+    let gpl = b"GPL\0";
+    u.license = gpl.as_ptr() as u64;
+
+    let insns = copy_instructions(prog).unwrap();
+    u.insn_cnt = insns.len() as u32;
+    u.insns = insns.as_ptr() as u64;
+    u.prog_type = bpf_prog_type::BPF_PROG_TYPE_TRACEPOINT as u32;
+
+    match sys_bpf(bpf_cmd::BPF_PROG_LOAD, &attr) {
+        Ok(v) => {
+            let fd = v as RawFd;
+            unsafe { close(fd) };
+            true
+        }
+        Err(_) => false,
+    }
+}
+
+fn arch_specific_syscall_prefix() -> Option<&'static str> {
+    if cfg!(target_arch = "aarch64") {
+        Some("arm64")
+    } else if cfg!(target_arch = "arm") {
+        Some("arm")
+    } else if cfg!(target_arch = "powerpc") {
+        Some("powerpc")
+    } else if cfg!(target_arch = "powerpc64") {
+        Some("powerpc64")
+    } else if cfg!(target_arch = "riscv32") || cfg!(target_arch = "riscv64") {
+        Some("riscv")
+    } else if cfg!(target_arch = "x86") {
+        Some("ia32")
+    } else if cfg!(target_arch = "x86_64") {
+        Some("x64")
+    } else if cfg!(target_arch = "s390x") {
+        Some("s390x")
+    } else if cfg!(target_arch = "s390") {
+        Some("s390")
+    } else if cfg!(target_arch = "mips") || cfg!(target_arch = "mips64") {
+        Some("mips")
+    } else {
+        None
+    }
+}
+
+pub(crate) fn is_bpf_syscall_wrapper_supported() -> bool {
+    let syscall_prefix_opt = arch_specific_syscall_prefix();
+
+    if let Some(syscall_prefix) = syscall_prefix_opt {
+        let syscall_name = format!("__{}_sys_bpf", syscall_prefix);
+
+        if let Ok(fd) = create_as_probe(crate::programs::ProbeKind::KProbe, &syscall_name, 0, None)
+        {
+            unsafe {
+                libc::close(fd);
+            }
 
             return true;
         }

@@ -7,7 +7,10 @@ mod fake;
 
 use std::io;
 #[cfg(not(test))]
-use std::{ffi::CString, mem};
+use std::{
+    ffi::{CStr, CString},
+    mem,
+};
 #[cfg(not(test))]
 use std::{fs::File, io::Read};
 
@@ -167,5 +170,24 @@ pub(crate) fn kernel_version() -> Result<(u32, u32, u32), ()> {
         }
 
         Ok((major, minor, patch))
+    }
+}
+
+#[cfg(test)]
+pub(crate) fn kernel_release() -> Result<String, ()> {
+    Ok("unknown".to_string())
+}
+
+#[cfg(not(test))]
+pub(crate) fn kernel_release() -> Result<String, ()> {
+    unsafe {
+        let mut v = mem::zeroed::<utsname>();
+        if libc::uname(&mut v as *mut _) != 0 {
+            return Err(());
+        }
+
+        let release = CStr::from_ptr(v.release.as_ptr());
+
+        Ok(release.to_string_lossy().into_owned())
     }
 }

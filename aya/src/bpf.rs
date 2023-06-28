@@ -119,7 +119,7 @@ fn detect_features() -> Features {
 pub struct BpfLoader<'a> {
     btf: Option<Cow<'a, Btf>>,
     map_pin_path: Option<PathBuf>,
-    globals: HashMap<&'a str, &'a [u8]>,
+    globals: HashMap<&'a str, (&'a [u8], bool)>,
     maps: HashMap<&'a str, &'a Map>,
     max_entries: HashMap<&'a str, u32>,
     extensions: HashSet<&'a str>,
@@ -205,6 +205,7 @@ impl<'a> BpfLoader<'a> {
     }
 
     /// Sets the value of a global variable.
+    /// If the `must_exist` argument is `true`, [`BpfLoader::load`] will fail with [`ParseError::SymbolNotFound`] if the loaded object code does not contain the variable.
     ///
     /// From Rust eBPF, a global variable can be defined as follows:
     ///
@@ -235,8 +236,8 @@ impl<'a> BpfLoader<'a> {
     /// use aya::BpfLoader;
     ///
     /// let bpf = BpfLoader::new()
-    ///     .set_global("VERSION", &2)
-    ///     .set_global("PIDS", &[1234u16, 5678])
+    ///     .set_global("VERSION", &2, true)
+    ///     .set_global("PIDS", &[1234u16, 5678], true)
     ///     .load_file("file.o")?;
     /// # Ok::<(), aya::BpfError>(())
     /// ```
@@ -245,8 +246,9 @@ impl<'a> BpfLoader<'a> {
         &mut self,
         name: &'a str,
         value: T,
+        must_exist: bool,
     ) -> &mut BpfLoader<'a> {
-        self.globals.insert(name, value.into().bytes);
+        self.globals.insert(name, (value.into().bytes, must_exist));
         self
     }
 

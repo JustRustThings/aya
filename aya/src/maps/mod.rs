@@ -219,8 +219,16 @@ impl AsFd for MapFd {
     }
 }
 
+impl From<MapFd> for OwnedFd {
+    fn from(x: MapFd) -> OwnedFd {
+        x.0
+    }
+}
+
 impl MapFd {
-    fn dup(&self) -> Result<MapFd, MapError> {
+    /// Creates a new `MapFd` instance that shares the same underlying file
+    /// description as the existing `MapFd` instance.
+    pub fn try_clone(&self) -> Result<MapFd, MapError> {
         Ok(MapFd(self.0.try_clone().map_err(|io_error| SyscallError {
             call: "dup2",
             io_error,
@@ -572,7 +580,7 @@ pub struct MapData {
 impl MapData {
     /// Recreates a MapData from an existing MapFd.
     pub(crate) fn create_from_fd(obj: obj::Map, fd: &MapFd) -> Result<Self, MapError> {
-        Ok(Self { obj, fd: fd.dup()? })
+        Ok(Self { obj, fd: fd.try_clone()? })
     }
 
     /// Creates a new map with the provided `name`

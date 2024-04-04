@@ -219,6 +219,15 @@ impl AsFd for MapFd {
     }
 }
 
+impl MapFd {
+    fn dup(&self) -> Result<MapFd, MapError> {
+        Ok(MapFd(self.0.try_clone().map_err(|io_error| SyscallError {
+            call: "dup2",
+            io_error,
+        })?))
+    }
+}
+
 /// Raises a warning about rlimit. Should be used only if creating a map was not
 /// successful.
 fn maybe_warn_rlimit() {
@@ -301,6 +310,33 @@ pub enum Map {
 }
 
 impl Map {
+    /// Returns the low level map.
+    pub(crate) fn map_data(&self) -> &MapData {
+        match self {
+            Map::Array(map) => map,
+            Map::CpuMap(map) => map,
+            Map::DevMap(map) => map,
+            Map::DevMapHash(map) => map,
+            Map::PerCpuArray(map) => map,
+            Map::ProgramArray(map) => map,
+            Map::HashMap(map) => map,
+            Map::LruHashMap(map) => map,
+            Map::PerCpuHashMap(map) => map,
+            Map::PerCpuLruHashMap(map) => map,
+            Map::PerfEventArray(map) => map,
+            Map::SockHash(map) => map,
+            Map::SockMap(map) => map,
+            Map::BloomFilter(map) => map,
+            Map::LpmTrie(map) => map,
+            Map::Stack(map) => map,
+            Map::StackTraceMap(map) => map,
+            Map::Queue(map) => map,
+            Map::RingBuf(map) => map,
+            Map::XskMap(map) => map,
+            Map::Unsupported(map) => map,
+        }
+    }
+
     /// Returns the low level map type.
     fn map_type(&self) -> u32 {
         match self {
@@ -534,6 +570,11 @@ pub struct MapData {
 }
 
 impl MapData {
+    /// Recreates a MapData from an existing MapFd.
+    pub(crate) fn create_from_fd(obj: obj::Map, fd: &MapFd) -> Result<Self, MapError> {
+        Ok(Self { obj, fd: fd.dup()? })
+    }
+
     /// Creates a new map with the provided `name`
     pub fn create(
         obj: obj::Map,

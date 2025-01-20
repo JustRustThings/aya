@@ -234,6 +234,12 @@ impl AsFd for MapFd {
     }
 }
 
+impl From<MapFd> for OwnedFd {
+    fn from(x: MapFd) -> OwnedFd {
+        x.fd.into_inner()
+    }
+}
+
 /// Raises a warning about rlimit. Should be used only if creating a map was not
 /// successful.
 fn maybe_warn_rlimit() {

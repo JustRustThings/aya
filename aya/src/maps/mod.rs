@@ -301,6 +301,12 @@ impl AsFd for MapFd {
     }
 }
 
+impl From<MapFd> for OwnedFd {
+    fn from(x: MapFd) -> Self {
+        x.fd.into_inner()
+    }
+}
+
 /// eBPF map types.
 #[derive(Debug)]
 pub enum Map {

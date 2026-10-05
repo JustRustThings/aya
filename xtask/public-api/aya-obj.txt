@@ -4845,7 +4845,6 @@ pub aya_obj::obj::Object::programs: std::collections::hash::map::HashMap<alloc::
 impl aya_obj::Object
 pub fn aya_obj::Object::fixup_and_sanitize_btf(&mut self, &aya_obj::btf::BtfFeatures) -> core::result::Result<core::option::Option<&aya_obj::btf::Btf>, aya_obj::btf::BtfError>
 impl aya_obj::Object
-pub fn aya_obj::Object::has_btf_relocations(&self) -> bool
 pub fn aya_obj::Object::parse(&[u8]) -> core::result::Result<Self, aya_obj::ParseError>
 pub fn aya_obj::Object::patch_map_data(&mut self, std::collections::hash::map::HashMap<&str, (&[u8], bool)>) -> core::result::Result<(), aya_obj::ParseError>
 pub fn aya_obj::Object::sanitize_functions(&mut self, &aya_obj::Features)
@@ -5442,7 +5441,6 @@ pub aya_obj::Object::programs: std::collections::hash::map::HashMap<alloc::strin
 impl aya_obj::Object
 pub fn aya_obj::Object::fixup_and_sanitize_btf(&mut self, &aya_obj::btf::BtfFeatures) -> core::result::Result<core::option::Option<&aya_obj::btf::Btf>, aya_obj::btf::BtfError>
 impl aya_obj::Object
-pub fn aya_obj::Object::has_btf_relocations(&self) -> bool
 pub fn aya_obj::Object::parse(&[u8]) -> core::result::Result<Self, aya_obj::ParseError>
 pub fn aya_obj::Object::patch_map_data(&mut self, std::collections::hash::map::HashMap<&str, (&[u8], bool)>) -> core::result::Result<(), aya_obj::ParseError>
 pub fn aya_obj::Object::sanitize_functions(&mut self, &aya_obj::Features)
